@@ -1,11 +1,11 @@
-# SmartTube VOT
+# SmartTube VOT — Yandex Voice-Over Translation for Android TV
 
-**SmartTube с закадровым переводом Яндекса для Android TV.**
+**Неофициальный форк SmartTube с закадровым переводом видео через Яндекс.**
 
 > SmartTube VOT is an unofficial fork of SmartTube. It is not affiliated with
 > the SmartTube developers or Yandex.
 
-[![Release](https://img.shields.io/github/v/release/Adrena1ine-ai/SmartTube-VOT?display_name=tag&label=release)](https://github.com/Adrena1ine-ai/SmartTube-VOT/releases/latest)
+[![Release](https://img.shields.io/github/v/release/Adrena1ine-ai/SmartTube-Yandex-VOT?display_name=tag&label=release)](https://github.com/Adrena1ine-ai/SmartTube-Yandex-VOT/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 Текущая версия: **SmartTube VOT 32.38 r1**, база — **SmartTube 32.38 Stable**.
@@ -24,13 +24,13 @@
 
 ## Скачать
 
-Скачивайте APK только из раздела [Releases](https://github.com/Adrena1ine-ai/SmartTube-VOT/releases).
+Скачивайте APK только из раздела [Releases](https://github.com/Adrena1ine-ai/SmartTube-Yandex-VOT/releases).
 
 Для релиза `v32.38-vot-public-r1`:
 
 | Параметр | Значение |
 |---|---|
-| APK | `SmartTube_VOT_32.38_public_r1_universal.apk` |
+| APK | `SmartTube_Yandex_VOT_32.38_r1_universal.apk` |
 | SHA-256 APK | `5a0abf7aee347abc3b27877aa4722987733e8b761289a22218d0498698c51f56` |
 | SHA-256 сертификата | `438644d831f64b92b2174ed616f83e690a3e62aabbf9d3f9169e055d1c026a7c` |
 | Application ID | `org.smarttube.vot` |
@@ -39,7 +39,7 @@
 Проверка файла в PowerShell:
 
 ```powershell
-Get-FileHash .\SmartTube_VOT_32.38_public_r1_universal.apk -Algorithm SHA256
+Get-FileHash .\SmartTube_Yandex_VOT_32.38_r1_universal.apk -Algorithm SHA256
 ```
 
 ## Установка
@@ -85,7 +85,7 @@ OAuth-токен **не обязателен**: обычный перевод р
 - красный — ошибка.
 
 Если ролик не переводится, создайте
-[issue](https://github.com/Adrena1ine-ai/SmartTube-VOT/issues/new/choose) и обязательно
+[issue](https://github.com/Adrena1ine-ai/SmartTube-Yandex-VOT/issues/new/choose) и обязательно
 приложите ссылку на видео. Не публикуйте OAuth-токены и другие секреты.
 
 ## Сборка из исходников

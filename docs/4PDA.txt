@@ -137,7 +137,7 @@ SmartTube VOT  → org.smarttube.vot
 [B]Файл:[/B]
 
 [CODE]
-SmartTube_VOT_32.38_public_r1_universal.apk
+SmartTube_Yandex_VOT_32.38_r1_universal.apk
 [/CODE]
 
 [B]SHA-256:[/B]
