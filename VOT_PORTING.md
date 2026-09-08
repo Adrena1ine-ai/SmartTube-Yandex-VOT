@@ -1,20 +1,21 @@
-# SmartTube Yandex VOT maintenance
+# SmartTube VOT maintenance
 
 ## Canonical checkpoint
 
 - SmartTube upstream base tag: `32.38s`
 - SmartTube upstream base commit: `26076c93237172af8e09656d2cfe06ab0d9eb872`
-- Initial 32.38 VOT port commit: `7b0b3e22b08f8c74180793b077a4880c9f5db633`
-- Canonical private release tag: `v32.38-vot-r1`
+- Original SmartTube Yandex VOT pull request: [yuliskov/SmartTube#5817](https://github.com/yuliskov/SmartTube/pull/5817)
+- Public source release tag: `v32.38-vot-public-r1`
 - Stable package: `org.smarttube.stable`
-- Build variant: `ststableDebug`, universal APK (`armeabi-v7a` + `arm64-v8a`)
-- Verified signing certificate SHA-256: `7b53c97a65361d2f48a3ad941ba40a429ef6e6fd7c1408b4054e2c3763524e89`
 - Public package: `org.smarttube.vot`
 - Public display name: `SmartTube VOT`
 - Public build variant: `stvotRelease`, universal APK (`armeabi-v7a` + `arm64-v8a`)
 - Public signing certificate SHA-256: `438644d831f64b92b2174ed616f83e690a3e62aabbf9d3f9169e055d1c026a7c`
 
-The tag is the complete maintained SmartTube 32.38 + Yandex VOT source checkpoint. Do not reconstruct the implementation from runtime logs or old experiments. The no-op VOT status implementation in `EmbedPlayerView` is required while that class implements `PlaybackView` without exposing full playback controls.
+The public tag is the complete maintained SmartTube 32.38 + Yandex VOT source
+checkpoint for this release. The no-op VOT status implementation in
+`EmbedPlayerView` is required while that class implements `PlaybackView` without
+exposing full playback controls.
 
 ## Maintained behavior
 
@@ -45,7 +46,9 @@ The tag is the complete maintained SmartTube 32.38 + Yandex VOT source checkpoin
 
 1. Fetch and verify the exact new upstream SmartTube release tag and commit.
 2. Create a dedicated branch/worktree from that upstream commit and initialize its pinned submodules.
-3. Port the canonical private VOT delta represented by `32.38s..v32.38-vot-r1`. Prefer replaying the two private VOT commits (`7b0b3e22` and the commit referenced by `v32.38-vot-r1`) with three-way conflict handling.
+3. Port the VOT implementation from the latest verified public release tag. Use
+   [SmartTube PR #5817](https://github.com/yuliskov/SmartTube/pull/5817) and the
+   community projects listed in `THIRD_PARTY_NOTICES.md` for provenance.
 4. Resolve actual integration conflicts file by file. Never replace newer SmartTube files wholesale with 32.38 files.
 5. Re-check every `PlaybackView` implementation when the `PlayerUI` contract changes; retain the `EmbedPlayerView` no-op only when required.
 6. Preserve server-derived status/ETA semantics and the operation-scoped one-shot fallback. Do not add fake progress percentages or arbitrary timeout failures.
@@ -59,9 +62,12 @@ The tag is the complete maintained SmartTube 32.38 + Yandex VOT source checkpoin
 8. Verify package, version, ABI, SHA-256, signing certificate, and absence of secrets in tracked files and the APK.
 9. Confirm exactly one intended ADB server and device. If package and certificate match, use only `adb install -r`; never uninstall or clear app data during an upgrade.
 10. Smoke-test launch, normal video playback, VOT button/UI, ordinary translation, lively translation, long-wait ETA, and automatic fallback.
-11. Commit the resolved port, push only to the private canonical repository, and tag the verified checkpoint.
+11. Commit and test the resolved port in the maintainer's canonical development
+    repository. Publish only the reviewed source commit/tag and release assets.
 
-Concise flow: new SmartTube tag → port canonical VOT delta → resolve real conflicts → tests/build → `adb install -r` → VOT smoke test → commit/push private checkpoint.
+Concise flow: new SmartTube tag → port the latest verified public VOT release →
+resolve real conflicts → tests/build → `adb install -r` → VOT smoke test →
+reviewed public source tag and release.
 
 ## Build and signing notes
 

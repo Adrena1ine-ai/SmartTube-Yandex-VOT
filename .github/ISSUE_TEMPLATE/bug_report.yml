@@ -1,0 +1,74 @@
+name: Проблемное видео / ошибка VOT
+description: Сообщить о ролике, который не переводится или работает неправильно
+title: "[VOT] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за отчёт. Не публикуйте OAuth-токены, логи с секретами и другие персональные данные.
+  - type: input
+    id: device
+    attributes:
+      label: Устройство
+      placeholder: Например, NVIDIA Shield TV 2019
+    validations:
+      required: true
+  - type: input
+    id: android
+    attributes:
+      label: Версия Android
+    validations:
+      required: true
+  - type: input
+    id: app_version
+    attributes:
+      label: Версия SmartTube VOT
+      placeholder: Например, 32.38 VOT r1
+    validations:
+      required: true
+  - type: input
+    id: video_url
+    attributes:
+      label: Ссылка на видео
+      description: Это главный элемент отчёта — без ссылки проблему часто нельзя воспроизвести.
+      placeholder: https://www.youtube.com/watch?v=...
+    validations:
+      required: true
+  - type: input
+    id: duration
+    attributes:
+      label: Длительность видео
+  - type: dropdown
+    id: oauth
+    attributes:
+      label: Использовался собственный OAuth?
+      options:
+        - Нет
+        - Да
+    validations:
+      required: true
+  - type: input
+    id: waited
+    attributes:
+      label: Сколько примерно ожидали?
+  - type: textarea
+    id: actual
+    attributes:
+      label: Что произошло?
+      description: Опишите действия, ожидаемое и фактическое поведение.
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Текст ошибки
+      description: Удалите токены, device ID, локальные адреса и другие персональные данные.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Проверка перед отправкой
+      options:
+        - label: Я не включил в отчёт OAuth-токен или другие секреты.
+          required: true

@@ -1,8 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Telegram group (international)
-    url: http://t.me/SmartTubeEN
-    about: "The international group is in **English only**. But don't worry if your English is not perfect, we have a friendly international community."
-  - name: Telegram group (RU/UA)
-    url: http://t.me/SmartTubeUA
-    about: "Group for Russian and Ukrainian speakers."
+  - name: Официальный SmartTube
+    url: https://github.com/yuliskov/SmartTube/issues
+    about: Ошибки, не связанные с VOT, следует проверять в основном проекте SmartTube.
