@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string translatable="false" name="app_name">SmartTube VOT</string>
+    <string translatable="false" name="browse_title">SmartTube VOT</string>
+    <string name="search_label">SmartTube VOT</string>
+    <string name="settings_description">SmartTube VOT Videos</string>
+    <string translatable="false" name="search_authority">org.smarttube.vot</string>
+</resources>

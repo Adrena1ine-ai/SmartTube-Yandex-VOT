@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="90dp"
+    android:layout_height="64dp"
+    android:clipChildren="false"
+    android:clipToPadding="false">
+
+    <ImageView
+        android:id="@id/button"
+        style="?attr/playbackControlsButtonStyle"
+        android:layout_width="90dp"
+        android:layout_height="64dp"
+        android:scaleType="center"
+        android:src="@drawable/lb_control_button_primary" />
+
+    <ImageView
+        android:id="@id/icon"
+        android:layout_width="@dimen/lb_control_icon_width"
+        android:layout_height="@dimen/lb_control_icon_height"
+        android:layout_gravity="center"
+        android:scaleType="fitCenter" />
+
+    <TextView
+        android:id="@id/label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:gravity="center"
+        android:includeFontPadding="false"
+        android:maxLines="1"
+        android:textColor="@color/white"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+</FrameLayout>
