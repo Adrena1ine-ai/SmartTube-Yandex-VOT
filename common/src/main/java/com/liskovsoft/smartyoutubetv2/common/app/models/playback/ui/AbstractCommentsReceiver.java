@@ -21,6 +21,18 @@ public abstract class AbstractCommentsReceiver implements CommentsReceiver {
     }
 
     @Override
+    public void loadFailed() {
+        if (mCallback != null) {
+            mCallback.onLoadFailed();
+        }
+    }
+
+    @Override
+    public void retry() {
+        onStart();
+    }
+
+    @Override
     public void loadBackup(Backup backup) {
         if (mCallback != null) {
             mCallback.onBackup(backup);
@@ -51,7 +63,7 @@ public abstract class AbstractCommentsReceiver implements CommentsReceiver {
 
     @Override
     public void onCommentLongClicked(CommentItem commentItem) {
-        
+
     }
 
     @Override
@@ -66,6 +78,11 @@ public abstract class AbstractCommentsReceiver implements CommentsReceiver {
         }
 
         return mContext.getString(R.string.loading);
+    }
+
+    @Override
+    public String getLoadFailedMessage() {
+        return mContext.getString(R.string.comments_load_failed);
     }
 
     @Override

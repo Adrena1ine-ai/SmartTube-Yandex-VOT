@@ -6,6 +6,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Button;
 import androidx.annotation.Nullable;
 import androidx.preference.DialogPreference;
 import com.bumptech.glide.Glide;
@@ -100,14 +101,33 @@ public class CommentsPreferenceDialogFragment extends LeanbackPreferenceDialogFr
         messagesList.requestFocus(); // hold focus even when there's no messages
         adapter.enableStackFromEnd(true);
         adapter.setLoadingMessage(mCommentsReceiver.getLoadingMessage());
+        final Button retryButton = view.findViewById(R.id.comments_retry_button);
+        retryButton.setOnClickListener(v -> {
+            retryButton.setVisibility(View.GONE);
+            // The recovery loads the thread from its first page. Clear any
+            // partial old pages so old comments cannot appear twice.
+            adapter.clear();
+            mCurrentGroup = null;
+            mFocusedMessage = null;
+            mBackupMessages = null;
+            adapter.setLoadingMessage(mCommentsReceiver.getLoadingMessage());
+            mCommentsReceiver.retry();
+        });
 
         mCommentsReceiver.setCallback(new Callback() {
             @Override
+            public void onLoadFailed() {
+                adapter.setLoadingMessage(mCommentsReceiver.getLoadFailedMessage());
+                retryButton.setVisibility(View.VISIBLE);
+            }
+
+            @Override
             public void onCommentGroup(CommentGroup commentGroup) {
                 if (commentGroup == null || commentGroup.getComments() == null) {
-                    adapter.setLoadingMessage(mCommentsReceiver.getErrorMessage());
+                    onLoadFailed(); // Invalid response is not proof of an empty thread.
                     return;
                 }
+                retryButton.setVisibility(View.GONE);
 
                 for (CommentItem commentItem : commentGroup.getComments()) {
                     if (ChatItemMessage.shouldSplit(commentItem)) {

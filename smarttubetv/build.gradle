@@ -69,8 +69,8 @@ android {
         applicationId "app.smarttube"
         minSdkVersion project.properties.minSdkVersion
         targetSdkVersion project.properties.targetSdkVersion
-        versionCode 2428
-        versionName "32.38"
+        versionCode 2458
+        versionName "32.68"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "long", "TIMESTAMP", System.currentTimeMillis() + "L"
 
@@ -199,6 +199,9 @@ android {
             targetSdkVersion project.properties.compileSdkVersion
         }
         stvot {
+            // Independent VOT maintenance build, above installed v32.68 code 2458.
+            versionCode 2459
+            versionName "32.68-vot-r2"
             applicationId "org.smarttube.vot"
             targetSdkVersion project.properties.compileSdkVersion
             matchingFallbacks = ["ststable"]
@@ -208,6 +211,11 @@ android {
             applicationId "app.smarttube.fdroid"
             minSdkVersion 21
             targetSdkVersion project.properties.compileSdkVersion
+
+            // The content of Universal apk
+            ndk {
+                abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86'
+            }
         }
     }
 }
@@ -284,4 +292,6 @@ dependencies {
 
     // ByeByeDPI fix
     implementation 'org.conscrypt:conscrypt-android:' + conscryptVersion
+
+    implementation 'androidx.work:work-runtime:' + workVersion
 }

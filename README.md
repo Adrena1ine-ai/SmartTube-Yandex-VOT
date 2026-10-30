@@ -8,7 +8,9 @@
 [![Release](https://img.shields.io/github/v/release/Adrena1ine-ai/SmartTube-Yandex-VOT?display_name=tag&label=release)](https://github.com/Adrena1ine-ai/SmartTube-Yandex-VOT/releases/latest)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Текущая версия: **SmartTube VOT 32.38 r1**, база — **SmartTube 32.38 Stable**.
+Текущая версия: **SmartTube VOT 32.68 R2**, база — **SmartTube 32.68 Stable**.
+
+**Обновление от 30.10.2026:** сохранён перевод Яндекса; добавлены пауза озвучки при буферизации, сохранение перевода при повторной загрузке того же видео и улучшенная повторная загрузка комментариев. Подробности — в [описании релиза](docs/releases/v32.68-vot-public-r2.md).
 
 ## Возможности
 
@@ -26,12 +28,12 @@
 
 Скачивайте APK только из раздела [Releases](https://github.com/Adrena1ine-ai/SmartTube-Yandex-VOT/releases).
 
-Для релиза `v32.38-vot-public-r1`:
+Для релиза `v32.68-vot-public-r2`:
 
 | Параметр | Значение |
 |---|---|
-| APK | `SmartTube_Yandex_VOT_32.38_r1_universal.apk` |
-| SHA-256 APK | `5a0abf7aee347abc3b27877aa4722987733e8b761289a22218d0498698c51f56` |
+| APK | `SmartTube_VOT_32.68_R2_ORIGINAL_KEY_SIGNED.apk` |
+| SHA-256 APK | `bc279f67fc5038295e506e800be611e78a1921e126743b7bfc976cfacecf6b90` |
 | SHA-256 сертификата | `438644d831f64b92b2174ed616f83e690a3e62aabbf9d3f9169e055d1c026a7c` |
 | Application ID | `org.smarttube.vot` |
 | Архитектуры | `arm64-v8a`, `armeabi-v7a` |
@@ -39,7 +41,7 @@
 Проверка файла в PowerShell:
 
 ```powershell
-Get-FileHash .\SmartTube_Yandex_VOT_32.38_r1_universal.apk -Algorithm SHA256
+Get-FileHash .\SmartTube_VOT_32.68_R2_ORIGINAL_KEY_SIGNED.apk -Algorithm SHA256
 ```
 
 ## Установка
@@ -73,7 +75,7 @@ OAuth-токен **не обязателен**: обычный перевод р
 Токен сохраняется только в приватных данных приложения пользователя. В исходном
 коде и публикуемом APK пользовательских OAuth-токенов нет.
 
-## Известные особенности r1
+## Известные особенности
 
 На некоторых длинных или редко переводимых видео Яндекс может долго готовить
 озвучку, а в отдельных случаях запрос завершается ошибкой. Интерфейс использует

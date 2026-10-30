@@ -1,0 +1,3 @@
+# Signed binaries are stored on server57 and Windows release folders, not committed to source Git.
+*.apk
+*.idsig

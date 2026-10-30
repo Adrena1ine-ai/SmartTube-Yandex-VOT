@@ -802,4 +802,6 @@
         <item quantity="many">%s секунд</item>
         <item quantity="other">%s секунды</item>
     </plurals>
+    <string name="comments_load_failed">Не удалось загрузить комментарии. Проверьте подключение и повторите попытку.</string>
+    <string name="comments_retry_button">Загрузить комментарии снова</string>
 </resources>

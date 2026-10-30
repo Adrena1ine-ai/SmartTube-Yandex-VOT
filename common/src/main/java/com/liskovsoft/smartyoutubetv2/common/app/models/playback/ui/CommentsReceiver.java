@@ -6,11 +6,14 @@ import com.liskovsoft.mediaserviceinterfaces.data.CommentItem;
 public interface CommentsReceiver {
     interface Callback {
         void onCommentGroup(CommentGroup commentGroup);
+        void onLoadFailed();
         void onBackup(Backup backup);
         void onSync(CommentItem commentItem);
     }
     interface Backup {}
     void addCommentGroup(CommentGroup commentGroup);
+    void loadFailed();
+    void retry();
     void loadBackup(Backup backup);
     void sync(CommentItem commentItem);
     void setCallback(Callback callback);
@@ -21,4 +24,5 @@ public interface CommentsReceiver {
     void onFinish(Backup backup);
     String getLoadingMessage();
     String getErrorMessage();
+    String getLoadFailedMessage();
 }

@@ -812,4 +812,6 @@
         <item quantity="one">%s second</item>
         <item quantity="other">%s seconds</item>
     </plurals>
+    <string name="comments_load_failed">Unable to load comments. Check the connection and try again.</string>
+    <string name="comments_retry_button">Retry loading comments</string>
 </resources>

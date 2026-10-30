@@ -62,6 +62,8 @@ public class VoiceTranslateController extends BasePlayerController {
     private String mTranslationAudioUrl;
     private String mPendingVideoUrl;
     private String mCurrentVideoId;
+    /** Main video is waiting for media; the translation must not play ahead. */
+    private boolean mMainVideoBuffering;
     private int mAutoTranslateRetryCount;
 
     private final Runnable mSyncRunnable = new Runnable() {
@@ -124,6 +126,23 @@ public class VoiceTranslateController extends BasePlayerController {
 
     @Override
     public void onNewVideo(Video item) {
+        // SmartTube also dispatches onNewVideo when it reloads the SAME video (SABR
+        // recovery, replay, remote control). Preserve the pending Yandex request or
+        // ready audio in that case, rather than requesting the translation again.
+        if (VotPlaybackContinuityPolicy.shouldKeepTranslation(
+                mCurrentVideoId, item != null ? item.videoId : null, mArmed,
+                mState == STATE_PENDING || mState == STATE_ACTIVE,
+                mTranslationPlayer != null || (mTranslationDisposable != null
+                        && !mTranslationDisposable.isDisposed()))) {
+            mMainVideoBuffering = true;
+            if (mTranslationPlayer != null) {
+                mTranslationPlayer.pause();
+            }
+            Log.d(TAG, "VOT keeping translation during same-video reload");
+            return;
+        }
+
+        mMainVideoBuffering = false;
         Utils.removeCallbacks(mAutoTranslateRetryRunnable, mErrorResetRunnable, mEtaTickRunnable);
         mAutoTranslateRetryCount = 0;
         cancelTranslationJob();
@@ -166,14 +185,25 @@ public class VoiceTranslateController extends BasePlayerController {
 
     @Override
     public void onPlay() {
+        mMainVideoBuffering = false;
         if (mState == STATE_ACTIVE && mTranslationPlayer != null) {
-            mTranslationPlayer.resume();
+            // Correct any accumulated drift before audio resumes after buffering.
             syncTranslationPositionIfNeeded();
+            mTranslationPlayer.resume();
         }
     }
 
     @Override
     public void onPause() {
+        mMainVideoBuffering = false;
+        if (mState == STATE_ACTIVE && mTranslationPlayer != null) {
+            mTranslationPlayer.pause();
+        }
+    }
+
+    @Override
+    public void onBuffering() {
+        mMainVideoBuffering = true;
         if (mState == STATE_ACTIVE && mTranslationPlayer != null) {
             mTranslationPlayer.pause();
         }
@@ -523,7 +553,7 @@ public class VoiceTranslateController extends BasePlayerController {
             if (getPlayer() != null && mTranslationPlayer != null) {
                 Log.d(TAG, "VOT translated audio ready: partial=%s", mPartialTranslation);
                 mTranslationPlayer.seekTo(getPlayer().getPositionMs());
-                if (!getPlayer().isPlaying()) {
+                if (mMainVideoBuffering || !getPlayer().isPlaying()) {
                     mTranslationPlayer.pause();
                 }
                 duckMainAudio();
@@ -547,7 +577,8 @@ public class VoiceTranslateController extends BasePlayerController {
     }
 
     private void syncTranslationPositionIfNeeded() {
-        if (mTranslationPlayer == null || getPlayer() == null || !mTranslationPlayer.isReady()) {
+        if (mMainVideoBuffering || mTranslationPlayer == null || getPlayer() == null
+                || !mTranslationPlayer.isReady()) {
             return;
         }
         long mainPos = getPlayer().getPositionMs();
@@ -589,6 +620,7 @@ public class VoiceTranslateController extends BasePlayerController {
     }
 
     private void disarm() {
+        mMainVideoBuffering = false;
         mUserArmed = false;
         mArmed = false;
         Utils.removeCallbacks(mAutoTranslateRetryRunnable, mErrorResetRunnable, mEtaTickRunnable);
@@ -604,6 +636,7 @@ public class VoiceTranslateController extends BasePlayerController {
     }
 
     private void disarmQuiet() {
+        mMainVideoBuffering = false;
         mArmed = false;
         cancelTranslationJob();
         releaseTranslationPlayer();
@@ -617,6 +650,7 @@ public class VoiceTranslateController extends BasePlayerController {
     }
 
     private void disarmWithMessage(int msgResId) {
+        mMainVideoBuffering = false;
         mUserArmed = false;
         mArmed = false;
         Utils.removeCallbacks(mAutoTranslateRetryRunnable, mErrorResetRunnable, mEtaTickRunnable);
@@ -633,6 +667,7 @@ public class VoiceTranslateController extends BasePlayerController {
     }
 
     private void handleTranslationError(String message) {
+        mMainVideoBuffering = false;
         String safeMessage = sanitizeDiagnostic(message);
         Log.e(TAG, "Translation error: %s", safeMessage);
         if (message != null && message.contains("auth required")) {

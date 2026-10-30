@@ -20,6 +20,7 @@ import com.google.android.exoplayer2.source.chunk.ContainerMediaChunk;
 import com.google.android.exoplayer2.source.chunk.InitializationChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunk;
 import com.google.android.exoplayer2.source.chunk.MediaChunkIterator;
+import com.google.android.exoplayer2.source.chunk.SingleSampleMediaChunk;
 import com.google.android.exoplayer2.source.sabr.PlayerEmsgHandler.PlayerTrackEmsgHandler;
 import com.google.android.exoplayer2.source.sabr.manifest.AdaptationSet;
 import com.google.android.exoplayer2.source.sabr.manifest.RangedUri;
@@ -28,6 +29,8 @@ import com.google.android.exoplayer2.source.sabr.manifest.SabrManifest;
 import com.google.android.exoplayer2.source.sabr.parser.adapter.SabrFragmentedMp4Adapter;
 import com.google.android.exoplayer2.source.sabr.parser.adapter.SabrMatroskaAdapter;
 import com.google.android.exoplayer2.source.sabr.parser.SabrStream;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrReloadPlayerError;
+import com.google.android.exoplayer2.source.sabr.parser.exceptions.SabrBackoffError;
 import com.google.android.exoplayer2.source.sabr.parser.models.AudioSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.CaptionSelector;
 import com.google.android.exoplayer2.source.sabr.parser.models.FormatSelector;
@@ -39,11 +42,14 @@ import com.google.android.exoplayer2.upstream.DataSpec;
 import com.google.android.exoplayer2.upstream.HttpDataSource.InvalidResponseCodeException;
 import com.google.android.exoplayer2.upstream.LoaderErrorThrower;
 import com.google.android.exoplayer2.upstream.TransferListener;
+import com.google.android.exoplayer2.util.Assertions;
 import com.google.android.exoplayer2.util.Log;
 import com.google.android.exoplayer2.util.MimeTypes;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -98,6 +104,8 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     private static final String TAG = DefaultSabrChunkSource.class.getSimpleName();
+    private static final long END_OF_STREAM_SEEK_TOLERANCE_US = 500_000L; // 0.5 seconds
+    private static final long NEAR_END_TOLERANCE_US = 700_000L; // 0.7 seconds
     private final LoaderErrorThrower manifestLoaderErrorThrower;
     private final int[] adaptationSetIndices;
     private final int trackType;
@@ -116,9 +124,10 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     private boolean missingLastSegment;
     private long liveEdgeTimeUs;
 
-    private final SabrStream sabrStream;
+    @Nullable private final SabrStream sabrStream;
     private final Map<String, String> sabrHeaders;
     private int nexChunkIdx = -1;
+    private long pendingSeekTimeUs = C.TIME_UNSET;
 
     /**
      * @param manifestLoaderErrorThrower Throws errors affecting loading of manifests.
@@ -167,21 +176,20 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         long periodDurationUs = manifest.getPeriodDurationUs(periodIndex);
         liveEdgeTimeUs = C.TIME_UNSET;
         
-        this.sabrStream = manifest.getSabrStream(trackType);
-        //this.sabrStream.setAudioSelection(createAudioSelection(trackType, trackSelection));
-        //this.sabrStream.setVideoSelection(createVideoSelection(trackType, trackSelection));
-        //this.sabrStream.setCaptionSelection(createCaptionSelection(trackType, trackSelection));
-        this.sabrStream.setFormatSelector(formatSelector);
-
         sabrHeaders = new HashMap<>();
         sabrHeaders.put("Content-Type", "application/x-protobuf");
         //sabrHeaders.put("Accept-Encoding", "identity");
         sabrHeaders.put("Accept", "application/vnd.yt-ump");
 
         List<Representation> representations = getRepresentations();
+        SabrStream stream = null;
         representationHolders = new RepresentationHolder[trackSelection.length()];
         for (int i = 0; i < representationHolders.length; i++) {
             Representation representation = representations.get(trackSelection.getIndexInTrackGroup(i));
+            if (stream == null && RepresentationHolder.needsExtractor(representation)) {
+                stream = manifest.getSabrStream(trackType);
+                stream.setFormatSelector(formatSelector);
+            }
             representationHolders[i] =
                     new RepresentationHolder(
                             periodDurationUs,
@@ -190,8 +198,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                             enableEventMessageTrack,
                             closedCaptionFormats,
                             playerTrackEmsgHandler,
-                            sabrStream);
+                            stream);
         }
+        this.sabrStream = stream;
     }
 
     @Override
@@ -231,6 +240,19 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //        return Util.resolveSeekPositionUs(positionUs, seekParameters, firstSyncUs, secondSyncUs);
         //    }
         //}
+
+        // Clamp a seek target that lands at/past the end of the video. Without this, seeking to
+        // exactly periodDurationUs (e.g. the app's "pause on end" logic parking the player at
+        // getDurationMs()) leaves nothing left to buffer, so getNextChunk() immediately re-signals
+        // endOfStream, which re-triggers STATE_ENDED, which re-triggers that same seek-to-end logic
+        // again - an infinite onTracksChanged()/STATE_ENDED loop every time playback reaches the end.
+        for (RepresentationHolder representationHolder : representationHolders) {
+            long periodDurationUs = representationHolder.periodDurationUs;
+            if (periodDurationUs != C.TIME_UNSET && positionUs >= periodDurationUs) {
+                // The constant is usually smaller than the real value in sabrStream.getEndOfStreamSeekToleranceMs()
+                return Math.max(0, periodDurationUs - END_OF_STREAM_SEEK_TOLERANCE_US);
+            }
+        }
         // We don't have a segment index to adjust the seek position with yet.
         return positionUs;
     }
@@ -306,6 +328,12 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         RepresentationHolder representationHolder =
                 representationHolders[trackSelection.getSelectedIndex()];
 
+        // External captions contain the entire subtitle track in one sample.
+        if (representationHolder.extractorWrapper == null && previous != null) {
+            out.endOfStream = true;
+            return;
+        }
+
         if (representationHolder.extractorWrapper != null) {
             Representation selectedRepresentation = representationHolder.representation;
             RangedUri pendingInitializationUri = null;
@@ -331,7 +359,9 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         boolean periodEnded = periodDurationUs != C.TIME_UNSET;
 
         // FIX: fire ending event on a video end
-        if (periodEnded && loadPositionUs >= periodDurationUs) {
+        // Tolerance needed: on some (usually short/sponsor at end) videos, real segment duration falls a fraction
+        // of a second short of periodDurationUs, so a strict ">=" never fires and getNextChunk() loops forever
+        if (periodEnded && (loadPositionUs + NEAR_END_TOLERANCE_US) >= periodDurationUs) {
             // No segment index in SABR, so we can't compare per-segment boundaries like stock
             // DASH does — comparing loadPositionUs directly against periodDurationUs is the
             // SABR equivalent. Without this, getNextChunk() keeps firing "next chunk" requests
@@ -392,6 +422,22 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //}
 
         long seekTimeUs = queue.isEmpty() ? loadPositionUs : C.TIME_UNSET;
+        if (sabrStream != null) {
+            if (seekTimeUs != C.TIME_UNSET) {
+                pendingSeekTimeUs = seekTimeUs;
+            } else if (pendingSeekTimeUs != C.TIME_UNSET) {
+                FormatId formatId = formatSelector.getSelectedFormatId();
+                if (sabrStream.hasSegmentStartTime(formatId != null ? formatId.getItag() : -1)) {
+                    pendingSeekTimeUs = C.TIME_UNSET; // the seek landed
+                } else {
+                    // FIX: the seek chunk failed (e.g. retried on an alternate media network) before
+                    // any segment arrived. The stream time is reset to 0 at this point, so without the
+                    // seek target the server would send segments from the start of the video.
+                    Log.w(TAG, "Retrying the seek to " + C.usToMs(pendingSeekTimeUs) + "ms");
+                    seekTimeUs = pendingSeekTimeUs;
+                }
+            }
+        }
         out.chunk =
                 newMediaChunk(
                         representationHolder,
@@ -434,10 +480,20 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     @Override
     public boolean onChunkLoadError(Chunk chunk, boolean cancelable, Exception e, long blacklistDurationMs) {
         Log.e(TAG, "Chunk load failed: " + e.getMessage());
+
+        // A reload request is not a transport failure. Handing it back as "handled" would
+        // retry the very same request at full speed. Let it fall through to the
+        // LoadErrorHandlingPolicy, which stashes the token and fails the load.
+        Throwable cause = e.getCause();
+        if (cause instanceof SabrReloadPlayerError || cause instanceof SabrBackoffError) {
+            Log.e(TAG, "SABR control signal, letting the error policy decide: " + cause.getMessage());
+            return false;
+        }
+
         if (!cancelable) {
             return false;
         }
-        if (isEndpointConnectionFailure(chunk, e)) {
+        if (!(chunk instanceof SingleSampleMediaChunk) && isEndpointConnectionFailure(chunk, e)) {
             if (manifest.maybeUseNextCdn(chunk.dataSpec.uri.toString())) {
                 Log.w(TAG, "Retrying SABR request on an alternate media network");
                 return true;
@@ -471,9 +527,23 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
     }
 
     private static boolean isEndpointConnectionFailure(Chunk chunk, Exception error) {
-        return chunk.bytesLoaded() == 0
-                && error instanceof IOException
-                && !(error instanceof InvalidResponseCodeException);
+        if (!(error instanceof IOException) || error instanceof InvalidResponseCodeException) {
+            return false;
+        }
+
+        // FIX: a media network that stalls in the middle of a response (read timeout) is as
+        // unusable as one that doesn't answer at all. Retrying the same network keeps stalling.
+        return chunk.bytesLoaded() == 0 || hasCause(error, SocketTimeoutException.class);
+    }
+
+    private static boolean hasCause(Throwable error, Class<? extends Throwable> type) {
+        for (Throwable cause = error; cause != null; cause = cause.getCause()) {
+            if (type.isInstance(cause)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private ArrayList<Representation> getRepresentations() {
@@ -571,6 +641,20 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             long firstSegmentNum,
             //int maxSegmentCount,
             long seekTimeUs) {
+        Representation representation = representationHolder.representation;
+        if (representationHolder.extractorWrapper == null) {
+            DataSpec dataSpec = new DataSpec(
+                    Uri.parse(representation.baseUrl), DataSpec.HTTP_METHOD_GET, null,
+                    0, 0, C.LENGTH_UNSET, representation.getCacheKey(), 0,
+                    manifest.visitorCookie != null
+                            ? Collections.singletonMap("Cookie", manifest.visitorCookie)
+                            : Collections.emptyMap());
+            return new SingleSampleMediaChunk(
+                    dataSource, dataSpec, trackFormat, trackSelectionReason, trackSelectionData,
+                    0, representationHolder.periodDurationUs, 0, trackType, trackFormat);
+        }
+
+        SabrStream sabrStream = Assertions.checkNotNull(this.sabrStream);
         boolean isInit = nexChunkIdx == -1;
         FormatId formatId = formatSelector.getSelectedFormatId();
         int iTag = formatId != null ? formatId.getItag() : -1;
@@ -588,8 +672,6 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
         //}
 
         nexChunkIdx++;
-
-        Representation representation = representationHolder.representation;
 
         //long startTimeMs = sabrStream.getSegmentStartTimeMs(trackType);
         //long durationMs = sabrStream.getSegmentDurationMs(trackType);
@@ -966,6 +1048,11 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
             return MimeTypes.isText(mimeType) || MimeTypes.APPLICATION_TTML.equals(mimeType);
         }
 
+        private static boolean needsExtractor(Representation representation) {
+            String containerMimeType = representation.format.containerMimeType;
+            return containerMimeType != null && !mimeTypeIsRawText(containerMimeType);
+        }
+
         private static @Nullable ChunkExtractorWrapper createExtractorWrapper(
                 int trackType,
                 Representation representation,
@@ -974,7 +1061,7 @@ public class DefaultSabrChunkSource implements SabrChunkSource {
                 TrackOutput playerEmsgTrackOutput,
                 SabrStream sabrStream) {
             String containerMimeType = representation.format.containerMimeType;
-            if (containerMimeType == null || mimeTypeIsRawText(containerMimeType)) {
+            if (!needsExtractor(representation)) {
                 return null;
             }
 

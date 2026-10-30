@@ -50,6 +50,14 @@
     <!--    android:paddingEnd="56dp"-->
     <!--    android:visibility="gone" />-->
 
+    <Button
+        android:id="@+id/comments_retry_button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:focusable="true"
+        android:text="@string/comments_retry_button" />
+
     <com.stfalcon.chatkit.messages.MessagesList
         android:id="@+id/messagesList"
         android:layout_width="match_parent"

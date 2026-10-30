@@ -18,10 +18,13 @@ import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.AbstractComm
 import com.liskovsoft.smartyoutubetv2.common.app.models.playback.ui.UiOptionItem;
 import com.liskovsoft.smartyoutubetv2.common.app.presenters.AppDialogPresenter;
 import io.reactivex.disposables.Disposable;
+import io.reactivex.Observable;
+import java.util.concurrent.TimeUnit;
 
 public class CommentsController extends BasePlayerController {
     private static final String TAG = CommentsController.class.getSimpleName();
     private Disposable mCommentsAction;
+    private Disposable mRefreshCommentsMetadataAction;
     private String mLiveChatKey;
     private String mCommentsKey;
     private String mTitle;
@@ -66,6 +69,10 @@ public class CommentsController extends BasePlayerController {
         CommentsReceiver commentsReceiver = new AbstractCommentsReceiver(getContext()) {
             @Override
             public void onLoadMore(CommentGroup commentGroup) {
+                if (commentGroup == null) {
+                    return;
+                }
+
                 loadComments(this, commentGroup.getNextCommentsKey());
             }
 
@@ -77,6 +84,13 @@ public class CommentsController extends BasePlayerController {
                 }
 
                 loadComments(this, mCommentsKey);
+            }
+
+            @Override
+            public void retry() {
+                // Long-lived sessions can hold an expired YouTube continuation.
+                // Fetch a fresh comments key before reissuing the failed request.
+                retryWithFreshKey(this);
             }
 
             @Override
@@ -148,17 +162,63 @@ public class CommentsController extends BasePlayerController {
 
     private void disposeActions() {
         RxHelper.disposeActions(mCommentsAction);
+        RxHelper.disposeActions(mRefreshCommentsMetadataAction);
+    }
+
+    private void retryWithFreshKey(CommentsReceiver receiver) {
+        disposeActions();
+        final com.liskovsoft.smartyoutubetv2.common.app.models.data.Video video = getVideo();
+        if (video == null || video.videoId == null) {
+            loadComments(receiver, mCommentsKey);
+            return;
+        }
+
+        final String videoId = video.videoId;
+        mRefreshCommentsMetadataAction = getMediaItemService()
+                .getMetadataObserve(videoId)
+                .subscribe(metadata -> {
+                    // An older response must not change the key of a newly opened video.
+                    if (getVideo() == null || !Helpers.equals(getVideo().videoId, videoId)) {
+                        return;
+                    }
+                    if (metadata != null && metadata.getCommentsKey() != null) {
+                        mCommentsKey = metadata.getCommentsKey();
+                        mBackup = null;
+                    }
+                    loadComments(receiver, mCommentsKey);
+                }, error -> {
+                    if (getVideo() == null || !Helpers.equals(getVideo().videoId, videoId)) {
+                        return;
+                    }
+                    Log.e(TAG, "Fresh comments metadata request failed: " +
+                            error.getClass().getSimpleName());
+                    loadComments(receiver, mCommentsKey);
+                });
     }
 
     private void loadComments(CommentsReceiver receiver, String commentsKey) {
         disposeActions();
+        if (commentsKey == null || commentsKey.isEmpty()) {
+            receiver.loadFailed();
+            return;
+        }
 
         mCommentsAction = getCommentsService().getCommentsObserve(commentsKey)
+                // A nullable or failed response is NOT evidence that a video has no comments.
+                // Two bounded retries (1s, 3s) cover transient failures without a loop.
+                .retryWhen(errors -> errors
+                        .zipWith(Observable.range(1, 3),
+                                (error, number) -> new Pair<>(error, number))
+                        .flatMap(attempt -> CommentsRetryPolicy.shouldRetry(attempt.second)
+                                ? Observable.timer(CommentsRetryPolicy.retryDelaySeconds(attempt.second), TimeUnit.SECONDS)
+                                : Observable.error(attempt.first)))
                 .subscribe(
                         receiver::addCommentGroup,
                         error -> {
-                            Log.e(TAG, error.getMessage());
-                            receiver.addCommentGroup(null); // remove loading message
+                            // Do not log URLs, API keys, cookies or continuation tokens.
+                            Log.e(TAG, "Comments request failed after bounded retries: " +
+                                    error.getClass().getSimpleName());
+                            receiver.loadFailed();
                         }
                 );
     }
